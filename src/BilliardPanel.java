@@ -1,19 +1,33 @@
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 public class BilliardPanel extends JPanel implements Runnable {
-    private ArrayList<Ball> balls = new ArrayList<>();
+    private final List<Ball> balls = new ArrayList<>();
     private boolean running = true;
 
     public BilliardPanel() {
         setBackground(Color.BLACK);
 
-        // Tạo 1 bóng ban đầu
-        Random r = new Random();
-        balls.add(new Ball(1, 100, 100, 20, Color.GREEN));
+        // Tạo 8 màu khác nhau
+        Color[] colors = {
+            Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW,
+            Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK
+        };
 
+        Random r = new Random();
+        int width = 800, height = 600;
+
+        // Tạo 8 quả bóng
+        for (int i = 0; i < 8; i++) {
+            int x = r.nextInt(width - 100) + 50;
+            int y = r.nextInt(height - 100) + 50;
+            balls.add(new Ball(i + 1, x, y, 20, colors[i]));
+        }
+
+        // Khởi động luồng mô phỏng
         Thread t = new Thread(this);
         t.start();
     }
@@ -23,13 +37,14 @@ public class BilliardPanel extends JPanel implements Runnable {
         super.paintComponent(g);
         Rectangle bounds = getBounds();
 
+        // Vẽ khung đỏ
+        g.setColor(Color.RED);
+        g.drawRect(0, 0, bounds.width - 1, bounds.height - 1);
+
+        // Vẽ từng bóng
         for (Ball b : balls) {
             b.draw(g);
         }
-
-        // Vẽ khung
-        g.setColor(Color.RED);
-        g.drawRect(0, 0, bounds.width - 1, bounds.height - 1);
     }
 
     @Override
@@ -38,6 +53,7 @@ public class BilliardPanel extends JPanel implements Runnable {
         while (running) {
             bounds = getBounds();
 
+            // Cập nhật vị trí tất cả bóng
             for (Ball b : balls) {
                 b.move(bounds);
             }
@@ -45,8 +61,10 @@ public class BilliardPanel extends JPanel implements Runnable {
             repaint();
 
             try {
-                Thread.sleep(20);
-            } catch (InterruptedException e) {}
+                Thread.sleep(20); // ~50 FPS
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
