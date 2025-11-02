@@ -7,9 +7,10 @@ import java.util.Random;
 public class BilliardPanel extends JPanel implements Runnable {
     private final List<Ball> balls = new ArrayList<>();
     private boolean running = true;
+    private final int borderThickness = 20; // 🔸 viền mỏng hơn (trước là 40)
 
     public BilliardPanel() {
-        setBackground(Color.BLACK);
+        setBackground(new Color(102, 51, 0)); // màu nâu gỗ (chỉ để nền khi khởi tạo)
 
         Color[] colors = {
             Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW,
@@ -34,10 +35,27 @@ public class BilliardPanel extends JPanel implements Runnable {
         super.paintComponent(g);
         Rectangle bounds = getBounds();
 
-        // khung
-        g.setColor(Color.RED);
-        g.drawRect(0, 0, bounds.width - 1, bounds.height - 1);
+        // ===== VẼ BÀN BI-A =====
+        Color borderColor = new Color(102, 51, 0); // 🔸 màu nâu gỗ
+        Color clothColor = new Color(0, 120, 0);   // màu xanh mặt bàn
 
+        // viền ngoài (nâu)
+        g.setColor(borderColor);
+        g.fillRect(0, 0, bounds.width, bounds.height);
+
+        // mặt bàn (xanh)
+        g.setColor(clothColor);
+        g.fillRect(borderThickness, borderThickness,
+                   bounds.width - borderThickness * 2,
+                   bounds.height - borderThickness * 2);
+
+        // đường viền trắng mảnh bên trong
+        // g.setColor(Color.WHITE);
+        // g.drawRect(borderThickness, borderThickness,
+        //            bounds.width - borderThickness * 2,
+        //            bounds.height - borderThickness * 2);
+
+        // vẽ bóng
         for (Ball b : balls) {
             b.draw(g);
         }
@@ -45,22 +63,24 @@ public class BilliardPanel extends JPanel implements Runnable {
 
     @Override
     public void run() {
-        Rectangle bounds;
         while (running) {
-            bounds = getBounds();
+            Rectangle playArea = new Rectangle(
+                borderThickness,
+                borderThickness,
+                getWidth() - borderThickness * 2,
+                getHeight() - borderThickness * 2
+            );
 
-            // 1) Kiểm tra va chạm giữa các cặp bóng (cập nhật vận tốc + positional correction)
             resolveCollisions();
 
-            // 2) Di chuyển tất cả bóng (bao gồm phản xạ tường)
             for (Ball b : balls) {
-                b.move(bounds);
+                b.move(playArea);
             }
 
             repaint();
 
             try {
-                Thread.sleep(16); // ~60 FPS, bạn có thể tăng lên 20ms nếu muốn
+                Thread.sleep(16);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -68,9 +88,9 @@ public class BilliardPanel extends JPanel implements Runnable {
     }
 
     private void resolveCollisions() {
-        double restitution = 1.0; // 1.0 = đàn hồi hoàn toàn; <1 mất năng lượng
-        double percent = 0.8;     // tỉ lệ positional correction (0..1)
-        double slop = 0.01;       // một ngưỡng nhỏ để tránh jitter khi chỉ chạm nhẹ
+        double restitution = 1.0;
+        double percent = 0.8;
+        double slop = 0.01;
 
         for (int i = 0; i < balls.size(); i++) {
             Ball A = balls.get(i);
@@ -83,41 +103,32 @@ public class BilliardPanel extends JPanel implements Runnable {
                 double rSum = A.radius + B.radius;
 
                 if (dist == 0.0) {
-                    // Tránh chia cho 0: dịch nhẹ ngẫu nhiên
                     dx = (Math.random() - 0.5) * 0.01;
                     dy = (Math.random() - 0.5) * 0.01;
                     dist = Math.sqrt(dx * dx + dy * dy);
                 }
 
                 if (dist < rSum) {
-                    // --- positional correction (giải quyết overlap) ---
                     double overlap = rSum - dist;
                     double correction = Math.max(overlap - slop, 0.0) / (1.0 / A.mass + 1.0 / B.mass);
                     double nx = dx / dist;
                     double ny = dy / dist;
                     double corrX = correction * nx * percent;
                     double corrY = correction * ny * percent;
-                    // Dịch A lùi, B tiến (tỉ lệ nghịch khối lượng)
+
                     A.x -= corrX / A.mass;
                     A.y -= corrY / A.mass;
                     B.x += corrX / B.mass;
                     B.y += corrY / B.mass;
 
-                    // --- velocity impulse (elastic collision) ---
-                    // tính relative velocity
                     double rvx = B.vx - A.vx;
                     double rvy = B.vy - A.vy;
-                    // velocity along normal
                     double velAlongNormal = rvx * nx + rvy * ny;
-                    // nếu đang tách ra (velAlongNormal > 0) thì bỏ qua
-                    if (velAlongNormal > 0)
-                        continue;
-                    // tính impulse scalar
-                    // tính impulse scalar
+                    if (velAlongNormal > 0) continue;
+
                     double impulse = -(1 + restitution) * velAlongNormal;
                     impulse = impulse / (1.0 / A.mass + 1.0 / B.mass);
 
-                    // áp dụng impulse
                     double impulseX = impulse * nx;
                     double impulseY = impulse * ny;
 
@@ -125,7 +136,6 @@ public class BilliardPanel extends JPanel implements Runnable {
                     A.vy -= impulseY / A.mass;
                     B.vx += impulseX / B.mass;
                     B.vy += impulseY / B.mass;
-
                 }
             }
         }
