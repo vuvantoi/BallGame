@@ -7,10 +7,12 @@ import java.util.Random;
 public class BilliardPanel extends JPanel implements Runnable {
     private final List<Ball> balls = new ArrayList<>();
     private boolean running = true;
-    private final int borderThickness = 20; // 🔸 viền mỏng hơn (trước là 40)
-    private final int holeRadius = 30; // bán kính lỗ ở giữa bàn
+    private final int borderThickness = 30; // 🔸 viền dày hơn khi bàn lớn
+    private final int holeRadius = 30; // bán kính lỗ ở giữa bàn (lớn hơn)
     private boolean firstFallOccurred = false; // đã có bi nào rơi chưa?
-    private final int initWidth = 800, initHeight = 600; // kích thước dùng để đặt bi ban đầu
+    private final int initWidth = 1400, initHeight = 750; // kích thước dùng để đặt bi ban đầu (rộng hơn)
+    private final int numBalls = 200; // số lượng bi
+    private final int ballRadius = 16; // kích thước mỗi bi (lớn hơn)
     // Lưu trạng thái ban đầu của các bi (được tạo lần đầu) để restart dùng lại
     private List<BallSpec> initialSpecs = null;
 
@@ -36,10 +38,10 @@ public class BilliardPanel extends JPanel implements Runnable {
             if (initialSpecs == null) {
                 // Tạo ngẫu nhiên và ghi lại để dùng cho lần restart sau
                 initialSpecs = new ArrayList<>();
-                for (int i = 0; i < 8; i++) {
+                for (int i = 0; i < numBalls; i++) {
                     int x = r.nextInt(width - 200) + 100;
                     int y = r.nextInt(height - 200) + 100;
-                    int radius = 20;
+                    int radius = ballRadius;
                     Color c = colors[i % colors.length];
                     balls.add(new Ball(i + 1, x, y, radius, c));
                     initialSpecs.add(new BallSpec(i + 1, x, y, radius, c));
@@ -110,13 +112,7 @@ public class BilliardPanel extends JPanel implements Runnable {
     g.setColor(new Color(30, 30, 30));
     g.drawOval(cx - holeRadius, cy - holeRadius, holeRadius * 2, holeRadius * 2);
 
-        // đường viền trắng mảnh bên trong
-        // g.setColor(Color.WHITE);
-        // g.drawRect(borderThickness, borderThickness,
-        //            bounds.width - borderThickness * 2,
-        //            bounds.height - borderThickness * 2);
-
-        // vẽ bóng
+        
         synchronized (balls) {
             for (Ball b : balls) {
                 if (b.active) b.draw(g);
