@@ -8,6 +8,7 @@ public class BilliardPanel extends JPanel implements Runnable {
     private final List<Ball> balls = new ArrayList<>();
     private boolean running = true;
     private final int borderThickness = 20; // 🔸 viền mỏng hơn (trước là 40)
+    private final int holeRadius = 30; // bán kính lỗ ở giữa bàn
 
     public BilliardPanel() {
         setBackground(new Color(102, 51, 0)); // màu nâu gỗ (chỉ để nền khi khởi tạo)
@@ -49,6 +50,16 @@ public class BilliardPanel extends JPanel implements Runnable {
                    bounds.width - borderThickness * 2,
                    bounds.height - borderThickness * 2);
 
+    // ===== VẼ LỖ Ở GIỮA BÀN =====
+    int cx = bounds.x + bounds.width / 2;
+    int cy = bounds.y + bounds.height / 2;
+    // lỗ màu đen sâu
+    g.setColor(Color.BLACK);
+    g.fillOval(cx - holeRadius, cy - holeRadius, holeRadius * 2, holeRadius * 2);
+    // viền nhẹ quanh lỗ
+    g.setColor(new Color(30, 30, 30));
+    g.drawOval(cx - holeRadius, cy - holeRadius, holeRadius * 2, holeRadius * 2);
+
         // đường viền trắng mảnh bên trong
         // g.setColor(Color.WHITE);
         // g.drawRect(borderThickness, borderThickness,
@@ -57,7 +68,7 @@ public class BilliardPanel extends JPanel implements Runnable {
 
         // vẽ bóng
         for (Ball b : balls) {
-            b.draw(g);
+            if (b.active) b.draw(g);
         }
     }
 
@@ -71,10 +82,34 @@ public class BilliardPanel extends JPanel implements Runnable {
                 getHeight() - borderThickness * 2
             );
 
+            // ignore collisions and motion for inactive balls
             resolveCollisions();
 
+            // move active balls
             for (Ball b : balls) {
-                b.move(playArea);
+                if (b.active) b.move(playArea);
+            }
+
+            // kiểm tra bi rơi vào lỗ ở giữa
+            int hx = getWidth() / 2;
+            int hy = getHeight() / 2;
+            List<Ball> toRemove = new ArrayList<>();
+            for (Ball b : balls) {
+                if (!b.active) continue;
+                double dx = b.x - hx;
+                double dy = b.y - hy;
+                double dist = Math.sqrt(dx * dx + dy * dy);
+                // nếu tâm bi nằm trong lỗ (cho một khoảng đệm)
+                if (dist < (holeRadius - 4)) {
+                    // đánh dấu là không hoạt động (rơi vào lỗ)
+                    b.active = false;
+                    toRemove.add(b);
+                }
+            }
+
+            // loại bỏ các bi đã rơi (giúp giảm xử lý sau này)
+            if (!toRemove.isEmpty()) {
+                balls.removeAll(toRemove);
             }
 
             repaint();
@@ -94,8 +129,10 @@ public class BilliardPanel extends JPanel implements Runnable {
 
         for (int i = 0; i < balls.size(); i++) {
             Ball A = balls.get(i);
+            if (!A.active) continue;
             for (int j = i + 1; j < balls.size(); j++) {
                 Ball B = balls.get(j);
+                if (!B.active) continue;
 
                 double dx = B.x - A.x;
                 double dy = B.y - A.y;
