@@ -8,26 +8,77 @@ public class BilliardPanel extends JPanel implements Runnable {
     private final List<Ball> balls = new ArrayList<>();
     private boolean running = true;
     private final int borderThickness = 20; // 🔸 viền mỏng hơn (trước là 40)
+    private final int holeRadius = 30; // bán kính lỗ ở giữa bàn
+    private boolean firstFallOccurred = false; // đã có bi nào rơi chưa?
+    private final int initWidth = 800, initHeight = 600; // kích thước dùng để đặt bi ban đầu
+    // Lưu trạng thái ban đầu của các bi (được tạo lần đầu) để restart dùng lại
+    private List<BallSpec> initialSpecs = null;
 
     public BilliardPanel() {
         setBackground(new Color(102, 51, 0)); // màu nâu gỗ (chỉ để nền khi khởi tạo)
-
-        Color[] colors = {
-            Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW,
-            Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK
-        };
-
-        Random r = new Random();
-        int width = 800, height = 600;
-
-        for (int i = 0; i < 8; i++) {
-            int x = r.nextInt(width - 200) + 100;
-            int y = r.nextInt(height - 200) + 100;
-            balls.add(new Ball(i + 1, x, y, 20, colors[i]));
-        }
+        initBalls();
 
         Thread t = new Thread(this);
         t.start();
+    }
+
+    // Khởi tạo lại danh sách bi (có thể gọi để restart)
+    private void initBalls() {
+        synchronized (balls) {
+            balls.clear();
+            Random r = new Random();
+            int width = initWidth, height = initHeight;
+            Color[] colors = {
+                Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW,
+                Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK
+            };
+
+            if (initialSpecs == null) {
+                // Tạo ngẫu nhiên và ghi lại để dùng cho lần restart sau
+                initialSpecs = new ArrayList<>();
+                for (int i = 0; i < 8; i++) {
+                    int x = r.nextInt(width - 200) + 100;
+                    int y = r.nextInt(height - 200) + 100;
+                    int radius = 20;
+                    Color c = colors[i % colors.length];
+                    balls.add(new Ball(i + 1, x, y, radius, c));
+                    initialSpecs.add(new BallSpec(i + 1, x, y, radius, c));
+                }
+            } else {
+                // Tạo lại từ initialSpecs để đảm bảo vị trí giống lần đầu
+                for (BallSpec s : initialSpecs) {
+                    balls.add(new Ball(s.id, s.x, s.y, s.radius, s.color));
+                }
+            }
+        }
+    }
+
+    // Mô tả đơn giản trạng thái ban đầu của một bi
+    private static class BallSpec {
+        int id;
+        int x, y;
+        int radius;
+        Color color;
+
+        BallSpec(int id, int x, int y, int radius, Color color) {
+            this.id = id;
+            this.x = x;
+            this.y = y;
+            this.radius = radius;
+            this.color = color;
+        }
+    }
+
+    // Reset toàn bộ mô phỏng: tạo lại bi, reset cờ, và khởi động lại vòng lặp
+    private void resetSimulation() {
+        firstFallOccurred = false;
+        initBalls();
+        // start a new simulation thread
+        if (!running) {
+            running = true;
+            Thread t = new Thread(this);
+            t.start();
+        }
     }
 
     @Override
@@ -49,6 +100,16 @@ public class BilliardPanel extends JPanel implements Runnable {
                    bounds.width - borderThickness * 2,
                    bounds.height - borderThickness * 2);
 
+    // ===== VẼ LỖ Ở GIỮA BÀN =====
+    int cx = bounds.x + bounds.width / 2;
+    int cy = bounds.y + bounds.height / 2;
+    // lỗ màu đen sâu
+    g.setColor(Color.BLACK);
+    g.fillOval(cx - holeRadius, cy - holeRadius, holeRadius * 2, holeRadius * 2);
+    // viền nhẹ quanh lỗ
+    g.setColor(new Color(30, 30, 30));
+    g.drawOval(cx - holeRadius, cy - holeRadius, holeRadius * 2, holeRadius * 2);
+
         // đường viền trắng mảnh bên trong
         // g.setColor(Color.WHITE);
         // g.drawRect(borderThickness, borderThickness,
@@ -56,8 +117,10 @@ public class BilliardPanel extends JPanel implements Runnable {
         //            bounds.height - borderThickness * 2);
 
         // vẽ bóng
-        for (Ball b : balls) {
-            b.draw(g);
+        synchronized (balls) {
+            for (Ball b : balls) {
+                if (b.active) b.draw(g);
+            }
         }
     }
 
@@ -71,10 +134,59 @@ public class BilliardPanel extends JPanel implements Runnable {
                 getHeight() - borderThickness * 2
             );
 
-            resolveCollisions();
+            // ignore collisions and motion for inactive balls
+            synchronized (balls) {
+                resolveCollisions();
 
-            for (Ball b : balls) {
-                b.move(playArea);
+                // move active balls
+                for (Ball b : balls) {
+                    if (b.active) b.move(playArea);
+                }
+
+                // kiểm tra bi rơi vào lỗ ở giữa
+                int hx = getWidth() / 2;
+                int hy = getHeight() / 2;
+                List<Ball> toRemove = new ArrayList<>();
+                for (Ball b : balls) {
+                    if (!b.active) continue;
+                    double dx = b.x - hx;
+                    double dy = b.y - hy;
+                    double dist = Math.sqrt(dx * dx + dy * dy);
+                    // nếu tâm bi nằm trong lỗ (cho một khoảng đệm)
+                    if (dist < (holeRadius - 4)) {
+                        // đánh dấu là không hoạt động (rơi vào lỗ)
+                        b.active = false;
+                        // nếu đây là bi đầu tiên rơi thì dừng mô phỏng và hiện thông báo
+                        if (!firstFallOccurred) {
+                            firstFallOccurred = true;
+                            int fallenId = b.id;
+                            // dừng vòng lặp run
+                            running = false;
+                            // Hiện thông báo trên EDT
+                            javax.swing.SwingUtilities.invokeLater(() -> {
+                                // Hiện dialog với nút Restart để khởi động lại mô phỏng
+                                Object[] options = {"Restart"};
+                                int sel = javax.swing.JOptionPane.showOptionDialog(this,
+                                    "Bi số " + fallenId + " đã rơi vào lỗ.",
+                                    "Thông báo",
+                                    javax.swing.JOptionPane.DEFAULT_OPTION,
+                                    javax.swing.JOptionPane.INFORMATION_MESSAGE,
+                                    null,
+                                    options,
+                                    options[0]);
+                                if (sel == 0) {
+                                    resetSimulation();
+                                }
+                            });
+                        }
+                        toRemove.add(b);
+                    }
+                }
+
+                // loại bỏ các bi đã rơi (giúp giảm xử lý sau này)
+                if (!toRemove.isEmpty()) {
+                    balls.removeAll(toRemove);
+                }
             }
 
             repaint();
@@ -94,8 +206,10 @@ public class BilliardPanel extends JPanel implements Runnable {
 
         for (int i = 0; i < balls.size(); i++) {
             Ball A = balls.get(i);
+            if (!A.active) continue;
             for (int j = i + 1; j < balls.size(); j++) {
                 Ball B = balls.get(j);
+                if (!B.active) continue;
 
                 double dx = B.x - A.x;
                 double dy = B.y - A.y;

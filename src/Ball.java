@@ -8,6 +8,7 @@ public class Ball {
     public double mass;
     public Color color;
     public int id;
+    public boolean active = true; // nếu false => bi đã rơi vào lỗ và không còn hiển thị/va chạm
 
     public Ball(int id, int x, int y, int radius, Color color) {
         this.id = id;
@@ -26,6 +27,7 @@ public class Ball {
     }
 
     public void move(Rectangle bounds) {
+        if (!active) return;
         x += vx;
         y += vy;
 

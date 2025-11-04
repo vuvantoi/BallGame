@@ -1,0 +1,15 @@
+# Java
+*.class
+*.jar
+*.war
+*.ear
+
+# IntelliJ / VSCode / NetBeans
+.idea/
+.vscode/
+nbproject/private/
+
+# Build
+/bin/
+/target/
+/build/
