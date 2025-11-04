@@ -11,15 +11,11 @@ public class BilliardPanel extends JPanel implements Runnable {
     private final int holeRadius = 30; // bán kính lỗ ở giữa bàn
     private boolean firstFallOccurred = false; // đã có bi nào rơi chưa?
     private final int initWidth = 800, initHeight = 600; // kích thước dùng để đặt bi ban đầu
+    // Lưu trạng thái ban đầu của các bi (được tạo lần đầu) để restart dùng lại
+    private List<BallSpec> initialSpecs = null;
 
     public BilliardPanel() {
         setBackground(new Color(102, 51, 0)); // màu nâu gỗ (chỉ để nền khi khởi tạo)
-
-        Color[] colors = {
-            Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW,
-            Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK
-        };
-
         initBalls();
 
         Thread t = new Thread(this);
@@ -36,11 +32,40 @@ public class BilliardPanel extends JPanel implements Runnable {
                 Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW,
                 Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK
             };
-            for (int i = 0; i < 8; i++) {
-                int x = r.nextInt(width - 200) + 100;
-                int y = r.nextInt(height - 200) + 100;
-                balls.add(new Ball(i + 1, x, y, 20, colors[i]));
+
+            if (initialSpecs == null) {
+                // Tạo ngẫu nhiên và ghi lại để dùng cho lần restart sau
+                initialSpecs = new ArrayList<>();
+                for (int i = 0; i < 8; i++) {
+                    int x = r.nextInt(width - 200) + 100;
+                    int y = r.nextInt(height - 200) + 100;
+                    int radius = 20;
+                    Color c = colors[i % colors.length];
+                    balls.add(new Ball(i + 1, x, y, radius, c));
+                    initialSpecs.add(new BallSpec(i + 1, x, y, radius, c));
+                }
+            } else {
+                // Tạo lại từ initialSpecs để đảm bảo vị trí giống lần đầu
+                for (BallSpec s : initialSpecs) {
+                    balls.add(new Ball(s.id, s.x, s.y, s.radius, s.color));
+                }
             }
+        }
+    }
+
+    // Mô tả đơn giản trạng thái ban đầu của một bi
+    private static class BallSpec {
+        int id;
+        int x, y;
+        int radius;
+        Color color;
+
+        BallSpec(int id, int x, int y, int radius, Color color) {
+            this.id = id;
+            this.x = x;
+            this.y = y;
+            this.radius = radius;
+            this.color = color;
         }
     }
 
