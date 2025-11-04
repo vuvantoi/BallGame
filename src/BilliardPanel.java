@@ -9,7 +9,7 @@ public class BilliardPanel extends JPanel implements Runnable {
     private boolean running = true;
     private boolean firstFallOccurred = false; // đã có bi nào rơi chưa?
     private final MapConfig config;
-    // Scaled geometry (map coords -> actual panel pixels)
+    // Hình học đã tỷ lệ (tọa độ bản đồ -> pixel thực tế trên panel)
     private Rectangle[] scaledWalls = null;
     private Point[] scaledStarts = null;
     private Point[] scaledHoles = null;
@@ -83,7 +83,7 @@ public class BilliardPanel extends JPanel implements Runnable {
                    bounds.width - config.borderThickness * 2,
                    bounds.height - config.borderThickness * 2);
 
-        // compute play area (inside border) and scale from map config to actual play pixels
+        // Tính toán khu vực chơi (bên trong viền) và tỷ lệ từ cấu hình bản đồ sang pixel thực tế
         int playX = config.borderThickness;
         int playY = config.borderThickness;
         int playW = Math.max(10, bounds.width - config.borderThickness * 2);
@@ -114,7 +114,7 @@ public class BilliardPanel extends JPanel implements Runnable {
                                             playY + (int) Math.round(config.startZones[i].y * sy));
             }
         } else {
-            // fallback: center of play area
+            // phương án dự phòng: đặt ở trung tâm khu vực chơi
             scaledStarts = new Point[] { new Point(playX + playW/2, playY + playH/2) };
         }
         if (config.holes != null) {
@@ -127,7 +127,7 @@ public class BilliardPanel extends JPanel implements Runnable {
             scaledHoles = null;
         }
 
-        // If initialSpecs weren't created (constructor ran before panel had size), create them now using scaled coords
+        // Nếu chưa tạo initialSpecs (constructor chạy trước khi panel có kích thước), tạo chúng bây giờ với tọa độ đã tỷ lệ
         if (initialSpecs == null && getWidth() > 0 && getHeight() > 0) {
             synchronized (balls) {
                 balls.clear();
