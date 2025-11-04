@@ -9,6 +9,8 @@ public class BilliardPanel extends JPanel implements Runnable {
     private boolean running = true;
     private final int borderThickness = 20; // 🔸 viền mỏng hơn (trước là 40)
     private final int holeRadius = 30; // bán kính lỗ ở giữa bàn
+    private boolean firstFallOccurred = false; // đã có bi nào rơi chưa?
+    private final int initWidth = 800, initHeight = 600; // kích thước dùng để đặt bi ban đầu
 
     public BilliardPanel() {
         setBackground(new Color(102, 51, 0)); // màu nâu gỗ (chỉ để nền khi khởi tạo)
@@ -18,17 +20,40 @@ public class BilliardPanel extends JPanel implements Runnable {
             Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK
         };
 
-        Random r = new Random();
-        int width = 800, height = 600;
-
-        for (int i = 0; i < 8; i++) {
-            int x = r.nextInt(width - 200) + 100;
-            int y = r.nextInt(height - 200) + 100;
-            balls.add(new Ball(i + 1, x, y, 20, colors[i]));
-        }
+        initBalls();
 
         Thread t = new Thread(this);
         t.start();
+    }
+
+    // Khởi tạo lại danh sách bi (có thể gọi để restart)
+    private void initBalls() {
+        synchronized (balls) {
+            balls.clear();
+            Random r = new Random();
+            int width = initWidth, height = initHeight;
+            Color[] colors = {
+                Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW,
+                Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK
+            };
+            for (int i = 0; i < 8; i++) {
+                int x = r.nextInt(width - 200) + 100;
+                int y = r.nextInt(height - 200) + 100;
+                balls.add(new Ball(i + 1, x, y, 20, colors[i]));
+            }
+        }
+    }
+
+    // Reset toàn bộ mô phỏng: tạo lại bi, reset cờ, và khởi động lại vòng lặp
+    private void resetSimulation() {
+        firstFallOccurred = false;
+        initBalls();
+        // start a new simulation thread
+        if (!running) {
+            running = true;
+            Thread t = new Thread(this);
+            t.start();
+        }
     }
 
     @Override
@@ -67,8 +92,10 @@ public class BilliardPanel extends JPanel implements Runnable {
         //            bounds.height - borderThickness * 2);
 
         // vẽ bóng
-        for (Ball b : balls) {
-            if (b.active) b.draw(g);
+        synchronized (balls) {
+            for (Ball b : balls) {
+                if (b.active) b.draw(g);
+            }
         }
     }
 
@@ -83,33 +110,58 @@ public class BilliardPanel extends JPanel implements Runnable {
             );
 
             // ignore collisions and motion for inactive balls
-            resolveCollisions();
+            synchronized (balls) {
+                resolveCollisions();
 
-            // move active balls
-            for (Ball b : balls) {
-                if (b.active) b.move(playArea);
-            }
-
-            // kiểm tra bi rơi vào lỗ ở giữa
-            int hx = getWidth() / 2;
-            int hy = getHeight() / 2;
-            List<Ball> toRemove = new ArrayList<>();
-            for (Ball b : balls) {
-                if (!b.active) continue;
-                double dx = b.x - hx;
-                double dy = b.y - hy;
-                double dist = Math.sqrt(dx * dx + dy * dy);
-                // nếu tâm bi nằm trong lỗ (cho một khoảng đệm)
-                if (dist < (holeRadius - 4)) {
-                    // đánh dấu là không hoạt động (rơi vào lỗ)
-                    b.active = false;
-                    toRemove.add(b);
+                // move active balls
+                for (Ball b : balls) {
+                    if (b.active) b.move(playArea);
                 }
-            }
 
-            // loại bỏ các bi đã rơi (giúp giảm xử lý sau này)
-            if (!toRemove.isEmpty()) {
-                balls.removeAll(toRemove);
+                // kiểm tra bi rơi vào lỗ ở giữa
+                int hx = getWidth() / 2;
+                int hy = getHeight() / 2;
+                List<Ball> toRemove = new ArrayList<>();
+                for (Ball b : balls) {
+                    if (!b.active) continue;
+                    double dx = b.x - hx;
+                    double dy = b.y - hy;
+                    double dist = Math.sqrt(dx * dx + dy * dy);
+                    // nếu tâm bi nằm trong lỗ (cho một khoảng đệm)
+                    if (dist < (holeRadius - 4)) {
+                        // đánh dấu là không hoạt động (rơi vào lỗ)
+                        b.active = false;
+                        // nếu đây là bi đầu tiên rơi thì dừng mô phỏng và hiện thông báo
+                        if (!firstFallOccurred) {
+                            firstFallOccurred = true;
+                            int fallenId = b.id;
+                            // dừng vòng lặp run
+                            running = false;
+                            // Hiện thông báo trên EDT
+                            javax.swing.SwingUtilities.invokeLater(() -> {
+                                // Hiện dialog với nút Restart để khởi động lại mô phỏng
+                                Object[] options = {"Restart"};
+                                int sel = javax.swing.JOptionPane.showOptionDialog(this,
+                                    "Bi số " + fallenId + " đã rơi vào lỗ.",
+                                    "Thông báo",
+                                    javax.swing.JOptionPane.DEFAULT_OPTION,
+                                    javax.swing.JOptionPane.INFORMATION_MESSAGE,
+                                    null,
+                                    options,
+                                    options[0]);
+                                if (sel == 0) {
+                                    resetSimulation();
+                                }
+                            });
+                        }
+                        toRemove.add(b);
+                    }
+                }
+
+                // loại bỏ các bi đã rơi (giúp giảm xử lý sau này)
+                if (!toRemove.isEmpty()) {
+                    balls.removeAll(toRemove);
+                }
             }
 
             repaint();
