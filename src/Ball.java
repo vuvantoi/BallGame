@@ -50,31 +50,30 @@ public class Ball {
     }
 
     public void draw(Graphics g) {
-    g.setColor(color);
-    g.fillOval((int)(x - radius), (int)(y - radius), radius * 2, radius * 2);
+        g.setColor(color);
+        g.fillOval((int)(x - radius), (int)(y - radius), radius * 2, radius * 2);
 
-    // --- Tính độ sáng ---
-    int brightness = (color.getRed() + color.getGreen() + color.getBlue()) / 3;
+        // --- Tính độ sáng ---
+        int brightness = (color.getRed() + color.getGreen() + color.getBlue()) / 3;
 
-    // --- Chuẩn bị vẽ ID ---
-    String s = String.valueOf(id);
-    Font font = new Font("Arial", Font.BOLD, 14);
-    g.setFont(font);
-    FontMetrics fm = g.getFontMetrics();
-    int tx = (int)(x - fm.stringWidth(s) / 2.0);
-    int ty = (int)(y + fm.getAscent() / 2.0);
+        // --- Chuẩn bị vẽ ID (kích thước tỉ lệ theo bán kính) ---
+        String s = String.valueOf(id);
+        Graphics2D g2 = (Graphics2D) g;
+        int fontSize = Math.max(8, (int)(radius * 1.0));
+        Font font = new Font("Arial", Font.BOLD, fontSize);
+        g2.setFont(font);
+        FontMetrics fm = g2.getFontMetrics();
+        int tx = (int)(x - fm.stringWidth(s) / 2.0);
+        int ty = (int)(y + fm.getAscent() / 2.0);
 
-    Graphics2D g2 = (Graphics2D) g;
-    g2.setFont(font);
+        // --- Vẽ viền sáng quanh chữ để nổi bật (độ dày tỉ lệ theo bán kính) ---
+        g2.setStroke(new BasicStroke(Math.max(1f, radius / 6f)));
+        g2.setColor(Color.WHITE);
+        g2.drawString(s, tx, ty);
 
-    // --- Vẽ viền sáng quanh chữ để nổi bật ---
-    g2.setStroke(new BasicStroke(2));
-    g2.setColor(Color.WHITE);
-    g2.drawString(s, tx, ty);
-
-    // --- Vẽ chữ chính ---
-    g2.setColor(Color.BLACK);
-    g2.drawString(s, tx, ty);
+        // --- Vẽ chữ chính ---
+        g2.setColor(Color.BLACK);
+        g2.drawString(s, tx, ty);
     }
 
 }
